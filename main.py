@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from agents import Agent, Runner, function_tool
 import re
 import os
-
+from sys import argv
 class FileSummary(BaseModel):
     files: list[str]
     implementation_summary: str
@@ -136,9 +136,14 @@ def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: i
         return f"File not found: {file_path}"
 
 if __name__ == "__main__":
+    if len(argv) < 2:
+        request = input("Enter a request: ")
+    else:
+        request = argv[1]
+
     agent = Agent(
         name="Codebase Agent",
-        model="gpt-4.1",
+        model="o4-mini",
         tools=[list_files, cat_file, grep_file, get_project_structure],
         instructions="""
 You're an expert software developer tasked with analyzing a codebase to identify the most relevant files for implementing a feature request or fixing a bug. Your goal is to thoroughly understand the codebase structure and dependencies before suggesting any implementation approach.
@@ -194,8 +199,9 @@ You're an expert software developer tasked with analyzing a codebase to identify
 - For any new functionality, you MUST first check existing implementations of similar features to understand coding patterns and standards.
 - When suggesting tool implementations, your code should mirror the style, parameter handling, docstring format, and error handling of existing similar tools.
 - You MUST use cat_file or grep_fileon key implementation files before making specific code recommendations.
+- Do not finish your response until you have followed all of the steps above.
 
-## Response Format:
+## Final Response Format:
 1. **Codebase Structure Summary**: Brief overview of the project type, architecture, and size.
 2. **Key Files Examined**: List of files you checked and why they're relevant.
 3. **Understanding of Current Implementation**: How the related functionality currently works.
@@ -205,5 +211,5 @@ You're an expert software developer tasked with analyzing a codebase to identify
     )
 
     print("Starting...")
-    result = Runner.run_sync(agent, input="Could we add an rm_file tool to the codebase and make it available to the agent?")
+    result = Runner.run_sync(agent, max_turns=50, input=request)
     print(result.final_output)
