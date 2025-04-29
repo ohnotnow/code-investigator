@@ -1,31 +1,25 @@
 # code-investigator
 
-An AI-powered tool for exploring and summarizing code repositories.  
-It provides a “Codebase Agent” with three built-in tools:
-- **list_files**: list files in a directory (optionally recursive)  
-- **cat_file**: read and return a file’s contents  
-- **grep_file**: search for a regex pattern in a file and return matching lines with context  
-
-The agent can be extended with new tools (e.g. an `rm_file` tool) and driven by feature requests to pinpoint relevant files for implementation guidance.
+A little experiment in AI-powered tools for exploring and finding relevant sections to implement a feature or bugfix.
 
 ---
 
 ## Table of Contents
-1. [Installation](#installation)  
-2. [Usage](#usage)  
-3. [Examples](#examples)  
-4. [Configuration](#configuration)  
-5. [Extending the Agent](#extending-the-agent)  
-6. [License](#license)  
+1. [Installation](#installation)
+2. [Usage](#usage)
+3. [Examples](#examples)
+4. [Configuration](#configuration)
+5. [Extending the Agent](#extending-the-agent)
+6. [License](#license)
 
 ---
 
 ## Installation
 
-Prerequisites  
-- Git  
-- Python 3.8+ (installed)  
-- `uv` tool (see https://docs.astral.sh/uv/)  
+Prerequisites
+- Git
+- Python 3.8+ (installed)
+- `uv` tool (see https://docs.astral.sh/uv/)
 
 Clone the repository and install dependencies:
 
@@ -38,7 +32,7 @@ cd code-investigator
 uv sync
 ```
 
-No platform-specific steps are required—`uv sync` reads your project’s declared dependencies and installs them in a virtual environment automatically.
+No platform-specific steps are required—`uv sync` reads your project’s declared dependencies and installs them in a virtual environment automatically.  **Note:** at the moment it is hard-coded to use an OpenAI model - so you need to set your OPENAI_API_KEY appropriately.
 
 ---
 
@@ -50,91 +44,107 @@ Run the main script with `uv`:
 uv run main.py
 ```
 
-By default, this will:
+This will:
 
-1. Instantiate the Codebase Agent with GPT-4.1 and the three tools.  
-2. Execute the sample prompt:  
-   > “Could we add an rm_file tool to the codebase and make it available to the agent?”  
+1. Ask you what you want to do with the codebase
+2. Get the overall project structure
+3. Begin to explore it, read files, search for references
+4. Write up a brief description of what changes should be made.
 
-To adjust the prompt or parameters, modify the call at the bottom of `main.py`:
+## Example run
 
-```python
-result = Runner.run_sync(
-    agent,
-    input="Your custom feature request here"
-)
+Enter a request: Could we change the admin -> users page to have the email address column before the name column?
+
+- Starting...
+- Getting project structure...
+- Listing files in app/Http/Controllers/Admin/Users
+- Reading app/Http/Controllers/Admin/Users/UserController.php
+- Reading resources/views/admin/user/index.blade.php
+- Searching for class AllUsers in app/Http/Livewire with 5 before and 5 after
+- Listing files in app/Http/Livewire
+- Reading app/Http/Livewire/AllUsersStatus.php
+- Reading resources/views/livewire/all-users-status.blade.php
+- Listing files in resources/views/admin/user
+- Reading resources/views/admin/user/partials/admin_menu.blade.php
+- Reading resources/views/admin/user/active.blade.php
+- Reading app/Http/Livewire/UserList.php
+- Reading resources/views/livewire/user-list.blade.php
+- Reading resources/views/admin/user/pending.blade.php
+
+1. Codebase Structure Summary
+- This is a Laravel 10 application using Livewire components for its admin UI.
+- User administration is handled by several Livewire components, notably `AllUsersStatus` (all users/status page) and `UserList` (active users page).
+- The “Active Users” admin page renders a table via the Livewire component `UserList`, defined in
+  • app/Http/Livewire/UserList.php
+  • resources/views/livewire/user-list.blade.php
+
+2. Key Files Examined
+- **app/Http/Livewire/UserList.php** – contains the filtering/sorting logic and passes a `$users` collection to the view.
+- **resources/views/livewire/user-list.blade.php** – the Blade template that lays out the table with columns: Name, Email, Type, Supervisor.
+
+3. Understanding of Current Implementation
+- The table header in `user-list.blade.php` is:
+    `<th>Name</th><th>Email</th><th>Type</th><th>Supervisor</th>…`
+- In each row, the first `<td>` renders the user’s full name linked to their profile, and the second `<td>` renders the user’s email.
+- Sorting by name or email is wired via Livewire (`wire:click.prevent="$set('sortField', 'surname')"` and similarly for email).
+
+4. Implementation Recommendations
+To swap the Email and Name columns so that Email appears first:
+
+A. Edit **resources/views/livewire/user-list.blade.php**:
+
+  1. Swap the first two `<th>` elements in the `<thead>` and adjust the sortField hooks:
+
+```diff
+     <thead>
+-        <tr>
+-            <th wire:click.prevent="$set('sortField', 'surname')" class="cursor-pointer">
+-                Name @if ($sortField == 'surname') &starf; @endif
+-            </th>
+-            <th wire:click.prevent="$set('sortField', 'email')" class="cursor-pointer">
+-                Email @if ($sortField == 'email') &starf; @endif
+-            </th>
++        <tr>
++            <th wire:click.prevent="$set('sortField', 'email')" class="cursor-pointer">
++                Email @if ($sortField == 'email') &starf; @endif
++            </th>
++            <th wire:click.prevent="$set('sortField', 'surname')" class="cursor-pointer">
++                Name @if ($sortField == 'surname') &starf; @endif
++            </th>
+             <th wire:click.prevent="$set('sortField', 'type')" class="cursor-pointer">
+                 Type @if ($sortField == 'type') &starf; @endif
+             </th>
 ```
 
-Then rerun:
+  2. In the `<tbody>` loop, swap the first two `<td>` blocks so Email is rendered first:
 
-```bash
-uv run main.py
+```diff
+     @foreach ($users as $user)
+         <tr id="user-row-{{ $user->id }}">
+-            <td>
+-                <a href="{{ route('user.show', $user->id) }}">{{ $user->full_name }}</a>
+-            </td>
+-            <td>
+-                <a href="{{ route('email.create', ['to' => $user->email]) }}">{{ $user->email }}</a>
+-            </td>
++            <td>
++                <a href="{{ route('email.create', ['to' => $user->email]) }}">{{ $user->email }}</a>
++            </td>
++            <td>
++                <a href="{{ route('user.show', $user->id) }}">{{ $user->full_name }}</a>
++            </td>
+             <td>
+                 {{ $user->type }}
+             </td>
 ```
 
----
+B. (Optional) If you wish the “Pending Users” table to mirror this column order, apply a similar swap in
+   **resources/views/admin/user/pending.blade.php** under the `<table>` there.
 
-## Examples
-
-Listing files recursively in the current directory from within the agent’s code:
-```python
-list_files(directory=".", recursive=True)
-```
-
-Reading a specific file:
-```python
-cat_file(file_path="agents.py")
-```
-
-Searching for a function definition in a file with context:
-```python
-grep_file(
-  file_path="main.py",
-  python_regex_pattern=r"def list_files",
-  include_before_lines=2,
-  include_after_lines=2
-)
-```
-
----
-
-## Configuration
-
-No environment variables are required by default. If you integrate with an external model provider that needs an API key (e.g. OpenAI), set the appropriate variable in your shell:
-
-```bash
-export OPENAI_API_KEY="your_api_key"
-```
-
----
-
-## Extending the Agent
-
-To add a new tool (for example, `rm_file`):
-
-1. Define a new function and decorate it with `@function_tool`.
-2. Implement the logic inside.
-3. Pass the function into the agent’s `tools` list in `main.py`.
-
-Example skeleton:
-
-```python
-@function_tool
-def rm_file(file_path: str) -> str:
-    """Remove a file and return status."""
-    # remove file logic here
-    return f"Removed {file_path}"
-```
-
-Then update:
-
-```python
-agent = Agent(
-    name="Codebase Agent",
-    model="gpt-4.1",
-    tools=[list_files, cat_file, grep_file, rm_file],
-    instructions="…"
-)
-```
+5. Reasoning
+- The Livewire view template alone dictates column ordering. By swapping the `<th>` and corresponding `<td>` blocks, the email column will render before the name column without affecting any underlying data logic.
+- Sorting behavior remains intact, as the same `sortField` bindings are just moved to the appropriate headers.
+- This change is minimal, isolated to the view, and maintains consistency with existing Livewire conventions.
 
 ---
 
