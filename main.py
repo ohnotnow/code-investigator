@@ -48,7 +48,7 @@ def get_project_structure() -> str:
                     entries.append('  ' * indent + f'- {item}')
         return entries
 
-    print("Getting project structure...")
+    print("- Getting project structure...")
     structure = ['.']
     structure.extend(list_dir_tree('.', 0))
     return '\n'.join(structure)
@@ -61,7 +61,7 @@ def write_report(files: list[str], implementation_summary: str) -> str:
 @function_tool
 def list_files(directory: str, recursive: bool) -> str:
     """List all files in a directory."""
-    print(f"Listing files in {directory} {'recursively' if recursive else ''}")
+    print(f"- Listing files in {directory} {'recursively' if recursive else ''}")
     file_list = ""
     if recursive:
         files = []
@@ -90,7 +90,7 @@ def list_files(directory: str, recursive: bool) -> str:
 @function_tool
 def cat_file(file_path: str) -> str:
     """Read a file and return the contents."""
-    print(f"Reading {file_path}")
+    print(f"- Reading {file_path}")
     try:
         with open(file_path, 'r') as file:
             return file.read()
@@ -104,7 +104,7 @@ def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: i
         include_before_lines = 0
     if not include_after_lines:
         include_after_lines = 0
-    print(f"Searching for {python_regex_pattern} in {file_path} with {include_before_lines} before and {include_after_lines} after")
+    print(f"- Searching for {python_regex_pattern} in {file_path} with {include_before_lines} before and {include_after_lines} after")
     try:
         with open(file_path, 'r') as file:
             lines = file.readlines()
@@ -210,6 +210,6 @@ You're an expert software developer tasked with analyzing a codebase to identify
         """
     )
 
-    print("Starting...")
+    print("\n\n- Starting...")
     result = Runner.run_sync(agent, max_turns=50, input=request)
     print(result.final_output)
