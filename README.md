@@ -4,16 +4,6 @@ A little experiment in AI-powered tools for exploring and finding relevant secti
 
 ---
 
-## Table of Contents
-1. [Installation](#installation)
-2. [Usage](#usage)
-3. [Examples](#examples)
-4. [Configuration](#configuration)
-5. [Extending the Agent](#extending-the-agent)
-6. [License](#license)
-
----
-
 ## Installation
 
 Prerequisites
