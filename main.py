@@ -4,6 +4,7 @@ from agents import Agent, Runner, function_tool
 import re
 import os
 from sys import argv
+from helpers.project_type import ProjectType
 class FileSummary(BaseModel):
     files: list[str]
     implementation_summary: str
@@ -17,6 +18,7 @@ def get_project_structure() -> str:
     - a list of non-hidden files in the root directory
     - a list of non-hidden directories in the root
     - a list of non-hidden directories in the all of the codebase
+    - a guess at the language and framework used
 
     The output should follow this format:
     .
@@ -29,6 +31,8 @@ def get_project_structure() -> str:
     - dir2/
         - dir3
         - dir4
+    
+    ## Estimated project type : PHP / Laravel
     """
     def list_dir_tree(path, indent):
         entries = []
@@ -51,6 +55,8 @@ def get_project_structure() -> str:
     print("- Getting project structure...")
     structure = ['.']
     structure.extend(list_dir_tree('.', 0))
+    project_type = ProjectType('.').run()
+    structure.append(f"\n\n## Estimated project type : {project_type.language} / {project_type.framework}\n\n")
     return '\n'.join(structure)
 
 @function_tool
@@ -207,6 +213,10 @@ You're an expert software developer tasked with analyzing a codebase to identify
 3. **Understanding of Current Implementation**: How the related functionality currently works.
 4. **Implementation Recommendations**: Specific files to modify and what changes to make.
 5. **Reasoning**: Explain why your suggested approach is appropriate for this codebase.
+
+## Final note
+Your response will be read by another LLM in order for it to actually implement your instructions.  So please be clear in your guidence to keep the LLM focussed and on-mission.
+
         """
     )
 
