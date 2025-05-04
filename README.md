@@ -1,6 +1,7 @@
 # code-investigator
 
-A little experiment in AI-powered tools for exploring and finding relevant sections to implement a feature or bugfix.
+A little experiment in AI-powered tools for exploring and finding relevant sections to implement a feature or bugfix.  It can
+also give you a head start on generating a Readme for the project.
 
 ---
 
@@ -22,24 +23,31 @@ cd code-investigator
 uv sync
 ```
 
-No platform-specific steps are required—`uv sync` reads your project’s declared dependencies and installs them in a virtual environment automatically.  **Note:** at the moment it is hard-coded to use an OpenAI model - so you need to set your OPENAI_API_KEY appropriately.
-
----
-
 ## Usage
+
+**Note:** at the moment it is hard-coded to use an OpenAI model - so you need to set your OPENAI_API_KEY appropriately.
 
 Run the main script with `uv`:
 
 ```bash
-uv run main.py
+# in code feature/bug mode
+uv run main.py --mode=code
+# in docs mode
+uv run main.py --mode=docs
 ```
 
-This will:
+In code mode this will:
 
 1. Ask you what you want to do with the codebase
 2. Get the overall project structure
 3. Begin to explore it, read files, search for references
 4. Write up a brief description of what changes should be made.
+
+In docs mode it will:
+
+1. Investigate the codebase
+2. Try and figure out the main parts, connections features
+3. Write out a structured GitHub Readme-style markdown report
 
 ## Example run
 
