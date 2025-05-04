@@ -1,10 +1,8 @@
-# from pydantic_ai import Agent, RunContext
 from pydantic import BaseModel
 from agents import Agent, Runner, function_tool
 import argparse
 import re
 import os
-from sys import argv
 from helpers.project_type import ProjectTypeAgent
 
 docs_prompt = """
@@ -288,7 +286,7 @@ def cat_file(file_path: str) -> str:
 
 @function_tool
 def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: int, include_after_lines: int) -> str:
-    """Search for a python re.searchpattern in a file and return the lines around the match."""
+    """Search for a python re.search pattern in a file and return the lines around the match."""
     if not include_before_lines:
         include_before_lines = 0
     if not include_after_lines:
