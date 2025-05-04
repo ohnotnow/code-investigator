@@ -1,9 +1,10 @@
 from pydantic import BaseModel
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, function_tool, ModelSettings
 import argparse
 import re
 import os
 from helpers.project_type import ProjectTypeAgent
+import time
 
 docs_prompt = """
 You're an expert software architect and technical writer tasked with analyzing a codebase to create comprehensive documentation. Your goal is to thoroughly understand what the application actually does, its architecture, design patterns, control flow, and organization by examining the actual implementation code in depth.
@@ -22,7 +23,12 @@ You're an expert software architect and technical writer tasked with analyzing a
    - This is just the starting point - do NOT draw conclusions about the application's purpose yet.
 
 2. **Core File Examination (MANDATORY)**:
-   - CRITICAL: You MUST read at least 5-10 actual implementation files in full using cat_file.
+   - CRITICAL: You MUST read at actual implementation files in full using cat_file.
+   - Depending on the size of the project, you may read more files to get a better understanding of the codebase.
+     - A small project as around 100 files.  You MUST read at least 5-10 files.
+     - A medium project as around 300+ files.  You MUST read at least 10-20 files.
+     - A large project as around 1000+ files.  You MUST read at least 30-40 files.
+   - DO NOT just read the Readme file - you MUST explore and read the codebase.
    - Focus on:
      * Controllers/route handlers that indicate main user flows
      * Model definitions that reveal the domain objects
@@ -73,7 +79,7 @@ You're an expert software architect and technical writer tasked with analyzing a
 - NEVER draw conclusions about application functionality without reading actual implementation code.
 - Always provide specific evidence from the code (file names, class names, method names, etc.) for your claims.
 - Configuration files and dependencies provide clues, but implementation details are authoritative.
-- Examine at least 2-3 files from EACH major component type (controllers, models, services, etc.).
+- Examine at least 2-3 files from EACH major domain in the project (for small projects this is controllers, models, services, etc., for large projects this is logical domains, like users, products, orders, etc.).
 - When documenting patterns, include specific code snippets or file references as evidence.
 - Ensure you understand custom abstractions specific to this project beyond framework defaults.
 - The bulk of your investigation time should be spent reading implementation files, not configuration.
@@ -98,7 +104,8 @@ For each section, include:
 ## Local development notes
 If the project is a Laravel project, you should know the following:
 - We use the 'lando' tool to run development servers (always mention the URL https://lando.dev/).
-- To run the project, copy .env.example to .env and run 'lando start'
+- To run the project, copy .env.example to .env and run 'lando start' then 'lando composer install'
+- The .env.example file will have all entries set to work with the lando server already.
 - Lando will start the project and show you the URLs in the terminal
 - You can run `lando mfs` to run the migrations and seeders
 - You can run `lando test` to run the tests
@@ -109,7 +116,12 @@ If the project is a Python project, you should know the following:
 - To run the project, run `uv run main.py` (or whatever the main file is)
 
 ## Final note
-The quality of your documentation depends on the depth of your code analysis. Focus on what the application actually does according to the implementation code, not what you think it might do based on the framework or library choices. Your documentation should reflect the reality of the codebase, not assumptions.
+The quality of your documentation depends on the depth of your code analysis. Focus on what the application actually
+does according to the implementation code, not what you think it might do based on the framework, project structure
+or library choices. Your documentation should reflect the reality of the codebase, not assumptions.  IT IS CRITICAL
+THAT YOU DO NOT MAKE ASSUMPTIONS ABOUT THE CODEBASE.  YOU MUST READ THE CODEBASE TO UNDERSTAND IT.  Imagine you were presented
+with your own report and had to understand the codebase from scratch.  You must be able to explain the codebase to someone else
+who has no idea what it is.
 """
 
 code_prompt = """
@@ -183,6 +195,36 @@ class FileSummary(BaseModel):
     files: list[str]
     implementation_summary: str
 
+def count_files(structure_output: str) -> int:
+    total_files = 0
+    lines = structure_output.strip().split('\n')
+
+    for line in lines:
+        # Skip empty lines
+        if not line.strip():
+            continue
+
+        # Check if line contains a file count
+        if '(' in line and ' file' in line:
+            # Extract the number between '(' and ' files)'
+            file_count_str = line.split('(')[1].split(' file')[0]
+            try:
+                file_count = int(file_count_str)
+                total_files += file_count
+            except ValueError:
+                # Skip if we can't parse the number
+                pass
+        # Check if it's a regular file (no directory indicator)
+        elif not line.strip().endswith('/') and not ('(' in line and ' file' in line):
+            # Count lines that represent individual files (they don't end with '/')
+            # and don't contain a file count
+            # Remove leading spaces and dash to check if it's a file entry
+            clean_line = line.strip()
+            if clean_line.startswith('- '):
+                total_files += 1
+
+    return total_files
+
 @function_tool
 def get_project_structure() -> str:
     """
@@ -210,6 +252,7 @@ def get_project_structure() -> str:
     """
     def list_dir_tree(path, indent):
         entries = []
+        total_files = 0
         try:
             items = sorted(os.listdir(path))
         except FileNotFoundError:
@@ -217,12 +260,13 @@ def get_project_structure() -> str:
         for item in items:
             if item.startswith('.'):
                 continue  # skip hidden files/dirs
-            if item == 'node_modules' or item == 'vendor' or item == 'dist' or item == 'build' or item == 'public' or item == 'cache' or item == 'logs':
+            if item == 'node_modules' or item == 'vendor' or item == 'dist' or item == "storage" or item == 'build' or item == 'public' or item == 'cache' or item == 'logs':
                 continue
             full_path = os.path.join(path, item)
             if os.path.isdir(full_path):
                 file_count = len(os.listdir(full_path))
-                entries.append('  ' * indent + f'- {item}/ ({file_count} {file_count == 1 and 'file' or 'files'})')
+                total_files += file_count
+                entries.append('  ' * indent + f'- {item}/ ({file_count} {'file' if file_count == 1 else 'files'})')
                 entries.extend(list_dir_tree(full_path, indent + 1))
             else:
                 if indent == 0:
@@ -230,12 +274,14 @@ def get_project_structure() -> str:
         return entries
 
     print("- Getting project structure...")
-    structure = ['.']
-    structure.extend(list_dir_tree('.', 0))
+    structure = list_dir_tree('.', 0)
     project_type = ProjectTypeAgent('.').run()
     project_info = f"\n\n## Estimated project type : {project_type.language} / {project_type.framework}\n\n"
+    # project_info += f"\n\n## Total files: {total_files}\n\n"
     output = '\n'.join(structure)
     output += project_info
+    total_files = count_files(output)
+    output += f"\n\n## Total files: {total_files}\n\n"
     return output
 
 @function_tool
@@ -278,6 +324,10 @@ def list_files(directory: str, recursive: bool) -> str:
 def cat_file(file_path: str) -> str:
     """Read a file and return the contents."""
     print(f"- Reading {file_path}")
+    if "readme" in file_path.lower():
+        # sometimes the LLM is 'lazy' and just reads the readme file.  So prevent it being useful.
+        print(f"  - Faking readme file: {file_path}")
+        return "# README\n\n- TODO\n\n"
     try:
         with open(file_path, 'r') as file:
             return file.read()
@@ -322,6 +372,35 @@ def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: i
     except FileNotFoundError:
         return f"File not found: {file_path}"
 
+def estimate_cost(total_input_tokens: int, total_output_tokens: int, model: str) -> float|str:
+    if model == "o4-mini":
+        input_cost = (total_input_tokens / 1_000_000) * 2.00
+        output_cost = (total_output_tokens / 1_000_000) * 8.00
+        return input_cost + output_cost
+    elif model == "gpt-4.1":
+        input_cost = (total_input_tokens / 1_000_000) * 1.10
+        output_cost = (total_output_tokens / 1_000_000) * 4.40
+        return input_cost + output_cost
+    elif model == "o3":
+        input_cost = (total_input_tokens / 1_000_000) * 10.00
+        output_cost = (total_output_tokens / 1_000_000) * 40.00
+        return input_cost + output_cost
+    else:
+        return "Unknown model"
+
+def print_usage(result, model, total_time_in_seconds):
+    print(f"\n\n- Usage:")
+    total_input_tokens = 0
+    total_output_tokens = 0
+    for response in result.raw_responses:
+        total_input_tokens += response.usage.input_tokens
+        total_output_tokens += response.usage.output_tokens
+    print(f"  - Total input tokens: {total_input_tokens}")
+    print(f"  - Total output tokens: {total_output_tokens}")
+    cost = estimate_cost(total_input_tokens, total_output_tokens, model)
+    print(f"  - Total cost: ${cost}")
+    print(f"  - Total time taken: {total_time_in_seconds} seconds")
+
 if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--request", type=str, required=False)
@@ -343,14 +422,20 @@ if __name__ == "__main__":
     if not request and mode == "docs":
         request = "Please provide a GitHub style Readme.md for the codebase."
 
+    start_time = time.time()
     agent = Agent(
         name=f"{mode.capitalize()} Agent",
         model=args.model,
         tools=[list_files, cat_file, grep_file, get_project_structure],
-        instructions=prompt
+        instructions=prompt,
+        model_settings=ModelSettings(include_usage=True)
     )
 
     print(f"\n\n- Starting agent using {args.model}...")
     result = Runner.run_sync(agent, max_turns=50, input=request)
+    print(f"\n\n- Agent finished")
+    end_time = time.time()
+    total_time_in_seconds = round(end_time - start_time, 2)
+    print_usage(result, args.model, total_time_in_seconds)
     print(f"\n\n- Final output:\n\n")
     print(result.final_output)
