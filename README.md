@@ -64,7 +64,7 @@ uv main.py --mode=docs --no-readme --request='Please investigate the RoomBooking
 uv main.py --mode=docs --request='Please pay particular attention to the GDPR code'
 ```
 
-## Example run
+## Example code-mode run
 
 Enter a request: Could we change the admin -> users page to have the email address column before the name column?
 
