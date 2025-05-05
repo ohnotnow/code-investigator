@@ -406,6 +406,7 @@ if __name__ == "__main__":
     args.add_argument("--request", type=str, required=False)
     args.add_argument("--mode", type=str, required=False, default="code")
     args.add_argument("--model", type=str, required=False, default="o4-mini")
+    args.add_argument("--no-readme", action="store_true", required=False, default=False)
     args = args.parse_args()
     request = args.request
     mode = args.mode
@@ -417,15 +418,23 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
-    if not args.request and mode == "code":
-        request = input("Enter a request: ")
-    if mode == "docs":
-        request = f"Please provide a GitHub style Readme.md for the codebase."
+    request = ""
+    if mode == "code":
+        if not args.request:
+            request = input("Enter a request: ")
+        else:
+            request = args.request
+    elif mode == "docs":
+        if not args.no_readme:
+            request = f"Please provide a GitHub style Readme.md for the codebase."
         if args.request:
-            request += f"\n\n## Final note\n\n{args.request}"
+            request += f"\n\n## User note\n\n{args.request}"
+    else:
+        print(f"Invalid mode: {mode}")
+        exit(1)
 
     if not request:
-        print("No request provided")
+        print("No request provided or inferrable from mode")
         exit(1)
 
     start_time = time.time()
