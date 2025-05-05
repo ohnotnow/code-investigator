@@ -417,10 +417,16 @@ if __name__ == "__main__":
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
-    if not request and mode == "code":
+    if not args.request and mode == "code":
         request = input("Enter a request: ")
-    if not request and mode == "docs":
-        request = "Please provide a GitHub style Readme.md for the codebase."
+    if mode == "docs":
+        request = f"Please provide a GitHub style Readme.md for the codebase."
+        if args.request:
+            request += f"\n\n## Final note\n\n{args.request}"
+
+    if not request:
+        print("No request provided")
+        exit(1)
 
     start_time = time.time()
     agent = Agent(
