@@ -49,6 +49,21 @@ In docs mode it will:
 2. Try and figure out the main parts, connections features
 3. Write out a structured GitHub Readme-style markdown report
 
+#### Extra options
+As well as the basic 'mode' you can pass the following :
+- `--no-readme`: only for 'docs' mode.  This skips the bit of the prompt which requires the LLM to write in the style of a GitHub readme
+- `--request`: Your specific requirements.  In code mode this is passed directly to the LLM as your requirements (if you don't pass it the script will prompt you for it).  In docs mode this is passed to the LLM as extra guidence ontop of the instruction to write in the style of a readme (unless you pass `--no-readme`)
+- `--model`: The OpenAI model you want to use.  Eg, 'gpt-4.1', 'o4-mini'.
+
+Eg:
+```bash
+# Ask for specific docs outside of a readme-style context
+uv main.py --mode=docs --no-readme --request='Please investigate the RoomBooking feature and document how it works, both front and back end. Also what tests are in place'
+
+# Regular docs readme mode - but with a hint to the LLM about something it might not focus on itself
+uv main.py --mode=docs --request='Please pay particular attention to the GDPR code'
+```
+
 ## Example run
 
 Enter a request: Could we change the admin -> users page to have the email address column before the name column?
