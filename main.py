@@ -5,6 +5,7 @@ import re
 import os
 from helpers.project_type import ProjectTypeAgent
 import time
+import subprocess
 
 docs_prompt = """
 You're an expert software architect and technical writer tasked with analyzing a codebase to create comprehensive documentation. Your goal is to thoroughly understand what the application actually does, its architecture, design patterns, control flow, and organization by examining the actual implementation code in depth.
@@ -14,12 +15,14 @@ You're an expert software architect and technical writer tasked with analyzing a
 - list_files: List all files in a directory.
 - cat_file: Read a file and return the whole contents.
 - grep_file: Search for a pattern in a file using Python's re.search and return the lines around the match.
+- get_git_remotes: Get the git remotes for the codebase (use this to help you write the installation instructions for `git clone`ing the codebase).
 
 ## Required Workflow (Follow these steps in order):
 
 1. **Initial Project Structure Assessment**:
    - Begin by using get_project_structure to understand the overall codebase organization.
    - Identify the type of codebase or framework based on configuration files.
+   - Use the get_git_remotes tool to get the git remotes for the codebase so you can write accurate `git clone` instructions.
    - This is just the starting point - do NOT draw conclusions about the application's purpose yet.
 
 2. **Core File Examination (MANDATORY)**:
@@ -102,6 +105,8 @@ For each section, include:
 - How these elements work together
 
 ## Local development notes
+**ALWAYS** use the get_git_remotes tool to get the git remotes for the codebase - otherwise the user reading your report will not know how to clone the codebase.
+
 If the project is a Laravel project, you should know the following:
 - We use the 'lando' tool to run development servers (always mention the URL https://lando.dev/).
 - To run the project, copy .env.example to .env and run 'lando start' then 'lando composer install'
@@ -132,6 +137,7 @@ You're an expert software developer tasked with analyzing a codebase to identify
 - list_files: List all files in a directory.
 - cat_file: Read a file and return the whole contents.
 - grep_file: Search for a pattern in a file using Python's re.search and return the lines around the match.
+- get_git_remotes: Get the git remotes for the codebase.
 
 ## Required Workflow (Follow these steps in order):
 
@@ -335,6 +341,13 @@ def cat_file(file_path: str) -> str:
         return f"File not found: {file_path}"
 
 @function_tool
+def get_git_remotes() -> str:
+    """Get the git remotes for the codebase."""
+    print(f"- Getting git remotes")
+    result = subprocess.run(['git', 'remote', '-v'], capture_output=True, text=True, cwd='.')
+    return result.stdout
+
+@function_tool
 def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: int, include_after_lines: int) -> str:
     """Search for a python re.search pattern in a file and return the lines around the match."""
     if not include_before_lines:
@@ -441,7 +454,7 @@ if __name__ == "__main__":
     agent = Agent(
         name=f"{mode.capitalize()} Agent",
         model=args.model,
-        tools=[list_files, cat_file, grep_file, get_project_structure],
+        tools=[list_files, cat_file, grep_file, get_project_structure, get_git_remotes],
         instructions=prompt,
         model_settings=ModelSettings(include_usage=True)
     )
