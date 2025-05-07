@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from agents import Agent, Runner, function_tool, ModelSettings
 import argparse
 import re
-import os
+from pathlib import Path
 from helpers.project_type import ProjectTypeAgent
 import time
 import subprocess
@@ -114,6 +114,7 @@ If the project is a Laravel project, you should know the following:
 - Lando will start the project and show you the URLs in the terminal
 - You can run `lando mfs` to run the migrations and seeders
 - You can run `lando test` to run the tests
+- We do not use docker or docker compose - we use lando - even if there is a docker-compose.yml file.
 
 If the project is a Python project, you should know the following:
 - We use the 'uv' tool to run development servers (https://docs.astral.sh/uv/getting-started/installation/).
@@ -202,10 +203,21 @@ class FileSummary(BaseModel):
     implementation_summary: str
 
 def filename_unsafe(filename: str) -> bool:
-    if filename.startswith('..') or filename.startswith('/'):
+    # Disallow absolute paths
+    p = Path(filename)
+    if p.is_absolute():
         return True
-    else:
-        return False
+    # Disallow parent directory traversal
+    if any(part == '..' for part in p.parts):
+        return True
+    # Disallow paths that escape the current working directory
+    try:
+        resolved = (Path.cwd() / p).resolve()
+        if not str(resolved).startswith(str(Path.cwd().resolve())):
+            return True
+    except Exception:
+        return True
+    return False
 
 def count_files(structure_output: str) -> int:
     total_files = 0
@@ -266,23 +278,22 @@ def get_project_structure() -> str:
         entries = []
         total_files = 0
         try:
-            items = sorted(os.listdir(path))
+            items = sorted([p for p in Path(path).iterdir()])
         except FileNotFoundError:
             return []
         for item in items:
-            if item.startswith('.'):
+            if item.name.startswith('.'):
                 continue  # skip hidden files/dirs
-            if item == 'node_modules' or item == 'vendor' or item == 'dist' or item == "storage" or item == 'build' or item == 'public' or item == 'cache' or item == 'logs':
+            if item.name in ['node_modules', 'vendor', 'dist', 'storage', 'build', 'public', 'cache', 'logs']:
                 continue
-            full_path = os.path.join(path, item)
-            if os.path.isdir(full_path):
-                file_count = len(os.listdir(full_path))
+            if item.is_dir():
+                file_count = len([f for f in item.iterdir() if not f.name.startswith('.')])
                 total_files += file_count
-                entries.append('  ' * indent + f'- {item}/ ({file_count} {'file' if file_count == 1 else 'files'})')
-                entries.extend(list_dir_tree(full_path, indent + 1))
+                entries.append('  ' * indent + f'- {item.name}/ ({file_count} {'file' if file_count == 1 else 'files'})')
+                entries.extend(list_dir_tree(item, indent + 1))
             else:
                 if indent == 0:
-                    entries.append('  ' * indent + f'- {item}')
+                    entries.append('  ' * indent + f'- {item.name}')
         return entries
 
     print("- Getting project structure...")
@@ -310,25 +321,17 @@ def list_files(directory: str, recursive: bool) -> str:
     file_list = ""
     if recursive:
         files = []
-        # We only want to list regular files and directories - ignore dotfiles
-        for root, dirs, current_files in os.walk(directory):
-            # Filter out dot directories
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
-            # filter out known dependancy directories
-            dirs[:] = [d for d in dirs if d not in ['node_modules', 'vendor', 'dist', 'build', 'public']]
-            # Filter out dot files and add to our list
-            for current_file in current_files:
-                if not current_file.startswith('.'):
-                    files.append(os.path.join(root, current_file))
-        # Remove duplicates and sort for consistent output
+        for p in Path(directory).rglob("*"):
+            if p.is_file() and not any(part.startswith('.') for part in p.parts) and not any(part in ['node_modules', 'vendor', 'dist', 'build', 'public'] for part in p.parts):
+                files.append(str(p))
         files = sorted(set(files))
         file_list = "\n".join(files)
     else:
         try:
             files = []
-            for file in os.listdir(directory):
-                if not file.startswith("."):
-                    files.append(os.path.join(directory, file))
+            for file in Path(directory).iterdir():
+                if not file.name.startswith("."):
+                    files.append(str(file))
             file_list = "\n".join(files)
         except FileNotFoundError:
             file_list = f"Directory not found: {directory}"
