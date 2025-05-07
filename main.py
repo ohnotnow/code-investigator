@@ -201,6 +201,12 @@ class FileSummary(BaseModel):
     files: list[str]
     implementation_summary: str
 
+def filename_unsafe(filename: str) -> bool:
+    if filename.startswith('..') or filename.startswith('/'):
+        return True
+    else:
+        return False
+
 def count_files(structure_output: str) -> int:
     total_files = 0
     lines = structure_output.strip().split('\n')
@@ -299,6 +305,8 @@ def write_report(files: list[str], implementation_summary: str) -> str:
 def list_files(directory: str, recursive: bool) -> str:
     """List all files in a directory."""
     print(f"- Listing files in {directory} {'recursively' if recursive else ''}")
+    if filename_unsafe(directory):
+        return "Forbidden"
     file_list = ""
     if recursive:
         files = []
@@ -329,6 +337,8 @@ def list_files(directory: str, recursive: bool) -> str:
 @function_tool
 def cat_file(file_path: str) -> str:
     """Read a file and return the contents."""
+    if filename_unsafe(file_path):
+        return "Forbidden"
     print(f"- Reading {file_path}")
     if "readme" in file_path.lower():
         # sometimes the LLM is 'lazy' and just reads the readme file.  So prevent it being useful.
@@ -350,6 +360,8 @@ def get_git_remotes() -> str:
 @function_tool
 def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: int, include_after_lines: int) -> str:
     """Search for a python re.search pattern in a file and return the lines around the match."""
+    if filename_unsafe(file_path):
+        return "Forbidden"
     if not include_before_lines:
         include_before_lines = 0
     if not include_after_lines:
