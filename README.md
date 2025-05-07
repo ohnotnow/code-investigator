@@ -69,18 +69,18 @@ It can be useful to set up some default functions in your shell if you use the s
 
 ```sh
 readme() {
-    source /Users/you/code/code_investigator/.venv/bin/activate
-    python /Users/you/code/code_investigator/main.py --mode=docs
+    source /Users/you/code/code-investigator/.venv/bin/activate
+    python /Users/you/code/code-investigator/main.py --mode=docs
     deactivate
 }
 docs() {
-    source /Users/you/code/code_investigator/.venv/bin/activate
-    python /Users/you/code/code_investigator/main.py --mode=docs --no-readme --request="$*"
+    source /Users/you/code/code-investigator/.venv/bin/activate
+    python /Users/you/code/code-investigator/main.py --mode=docs --no-readme --request="$*"
     deactivate
 }
 investigate() {
-    source /Users/you/code/code_investigator/.venv/bin/activate
-    python /Users/you/code/code_investigator/main.py --mode=code --request="$*"
+    source /Users/you/code/code-investigator/.venv/bin/activate
+    python /Users/you/code/code-investigator/main.py --mode=code --request="$*"
     deactivate
 }
 ```
