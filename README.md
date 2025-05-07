@@ -64,6 +64,39 @@ uv main.py --mode=docs --no-readme --request='Please investigate the RoomBooking
 uv main.py --mode=docs --request='Please pay particular attention to the GDPR code'
 ```
 
+## Shell functions
+It can be useful to set up some default functions in your shell if you use the script a lot.  Eg, in your `~/.bashrc` or `~/.zshrc`:
+
+```sh
+readme() {
+    source /Users/you/code/code_investigator/.venv/bin/activate
+    python /Users/you/code/code_investigator/main.py --mode=docs
+    deactivate
+}
+docs() {
+    source /Users/you/code/code_investigator/.venv/bin/activate
+    python /Users/you/code/code_investigator/main.py --mode=docs --no-readme --request="$*"
+    deactivate
+}
+investigate() {
+    source /Users/you/code/code_investigator/.venv/bin/activate
+    python /Users/you/code/code_investigator/main.py --mode=code --request="$*"
+    deactivate
+}
+```
+
+And open a new shell or source the file.  Now you can just run things like :
+```bash
+# generate a readme
+$ readme
+
+# generate specific docs on a feature
+$ docs 'explain how the Pydantic models relate to each other'
+
+# investigate an issue
+$ investigate 'Exception on line 302: main.py - invalid data in timestamp'
+```
+
 ## Example code-mode run
 
 Enter a request: Could we change the admin -> users page to have the email address column before the name column?
