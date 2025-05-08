@@ -503,6 +503,8 @@ def cat_file(file_path: str) -> str:
     """Read a file and return the contents."""
     if filename_unsafe(file_path):
         return "Forbidden"
+    if not is_a_valid_file(file_path):
+        return f"Not a valid file: {file_path}"
     print(f"- Reading {file_path}")
     if "readme" in file_path.lower():
         # sometimes the LLM is 'lazy' and just reads the readme file.  So prevent it being useful.
@@ -521,11 +523,16 @@ def get_git_remotes() -> str:
     result = subprocess.run(['git', 'remote', '-v'], capture_output=True, text=True, cwd='.')
     return result.stdout
 
+def is_a_valid_file(file_path: str) -> bool:
+    return Path(file_path).exists() and Path(file_path).is_file()
+
 @function_tool
 def grep_file(file_path: str, python_regex_pattern: str, include_before_lines: int, include_after_lines: int) -> str:
-    """Search for a python re.search pattern in a file and return the lines around the match."""
+    """Search for a python re.search pattern in a single file (no recursion or directory listing) and return the lines around the match."""
     if filename_unsafe(file_path):
         return "Forbidden"
+    if not is_a_valid_file(file_path):
+        return f"Not a valid file: {file_path}"
     if not include_before_lines:
         include_before_lines = 0
     if not include_after_lines:
