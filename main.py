@@ -282,7 +282,7 @@ You're an expert Laravel developer tasked with analyzing a codebase to create de
 - Use SIMPLE alphanumeric node IDs without special characters (e.g., A1, UserAuth, DB1).
 - IMPORTANT: Node IDs must be simple and cannot contain special characters, spaces, or punctuation.
 - For node labels, use only basic characters inside square brackets: [Label text].
-- Avoid using parentheses, colons, or other special characters in node labels (eg, <, >, &, etc).
+- Avoid using parentheses, colons, or other special characters in node labels, eg, <, >, &, (, ), etc.
 - For method names in labels, use dot notation without parentheses: "Controller.method" NOT "Controller@method" or "Controller->method()".
 - Decision diamonds should use simple yes/no or true/false paths.
 - Format subgraphs with proper syntax:
@@ -608,13 +608,84 @@ def print_usage(result, model, total_time_in_seconds):
     print(f"  - Total cost: ${cost}")
     print(f"  - Total time taken: {total_time_in_seconds} seconds")
 
+def sanitise_mermaid_syntax(text: str) -> str:
+    """
+    Find all mermaid code blocks and ensure node IDs are alphanumeric (no special characters or spaces),
+    and node labels do not contain forbidden characters (parentheses, colons, @, <, >, &, etc).
+    Only sanitize labels in valid node and edge definitions while preserving overall structure.
+    """
+    def sanitise_node_id(node_id):
+        # Only allow alphanumeric and underscores
+        return re.sub(r'[^A-Za-z0-9_]', '_', node_id)
+
+    def sanitise_label(label):
+        # Remove forbidden characters from labels
+        return re.sub(r'[()@:<>&]', '', label)
+
+    def process_mermaid_block(block):
+        lines = block.split('\n')
+        new_lines = []
+
+        for line in lines:
+            # Skip comment lines or directive lines
+            if re.match(r'\s*%%', line) or re.match(r'\s*flowchart', line) or re.match(r'\s*subgraph', line) or line.strip() == 'end':
+                new_lines.append(line)
+                continue
+
+            # First pass: sanitize node IDs in isolation (before looking at connections)
+            # This is for node definitions like: NodeID[Label]
+            node_pattern = re.compile(r'([A-Za-z0-9_\-]+)([\[\{\(][^\]\}\)]*[\]\}\)])')
+            for match in node_pattern.finditer(line):
+                node_id, label_part = match.groups()
+                clean_id = sanitise_node_id(node_id)
+                # Extract and clean the label text
+                label_match = re.match(r'([\[\{\(])([^\]\}\)]*)([\]\}\)])', label_part)
+                if label_match:
+                    open_br, label, close_br = label_match.groups()
+                    clean_label = sanitise_label(label)
+                    clean_label_part = f"{open_br}{clean_label}{close_br}"
+                    # Replace just this node and label in the line
+                    old_part = node_id + label_part
+                    new_part = clean_id + clean_label_part
+                    line = line.replace(old_part, new_part, 1)
+
+            # Second pass: sanitize connections
+            # This handles arrow patterns like: NodeA --> NodeB
+            # We'll use word boundaries to avoid partial matches
+            arrow_pattern = re.compile(r'\b([A-Za-z0-9_\-]+)\b\s*--?>+')
+            for match in arrow_pattern.finditer(line):
+                node_id = match.group(1)
+                clean_id = sanitise_node_id(node_id)
+                if node_id != clean_id:
+                    # Replace just this node ID in the line, with word boundaries to avoid partial matches
+                    line = re.sub(r'\b' + re.escape(node_id) + r'\b', clean_id, line, count=1)
+
+            new_lines.append(line)
+
+        return '\n'.join(new_lines)
+
+    # Regex to find all mermaid code blocks
+    def mermaid_block_iter(text):
+        pattern = re.compile(r'(```mermaid(?:js)?\n)(.*?)(```)', re.DOTALL)
+        for m in pattern.finditer(text):
+            yield m
+
+    # Replace each block with sanitised version
+    new_text = text
+    for m in mermaid_block_iter(text):
+        block = m.group(2)
+        processed = process_mermaid_block(block)
+        new_text = new_text.replace(m.group(0), f'{m.group(1)}{processed}{m.group(3)}')
+
+    return new_text
+
 if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--request", type=str, required=False)
     args.add_argument("--mode", type=str, required=False, default="code")
     args.add_argument("--model", type=str, required=False, default="o4-mini")
     args.add_argument("--no-readme", action="store_true", required=False, default=False)
-    args.add_argument("--output-file", type=str, required=False, default="report.md")
+    args.add_argument("--output-file", type=str, required=False, default=None)
     args = args.parse_args()
     request = args.request
     mode = args.mode
@@ -663,7 +734,12 @@ if __name__ == "__main__":
     total_time_in_seconds = round(end_time - start_time, 2)
     print_usage(result, args.model, total_time_in_seconds)
     print(f"\n\n- Final output:\n\n")
-    print(result.final_output)
+    # Sanitize mermaid diagrams before writing
+    final_output = sanitise_mermaid_syntax(result.final_output)
+    print(final_output)
     if args.output_file:
-        with open(args.output_file, "w") as f:
-            f.write(result.final_output)
+        output_filename = args.output_file
+    else:
+        output_filename = f"report_{mode}_{time.strftime('%Y_%m_%d_%H_%M_%S')}.md"
+    with open(output_filename, "w") as f:
+        f.write(final_output)
