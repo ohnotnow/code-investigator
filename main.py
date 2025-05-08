@@ -282,7 +282,7 @@ You're an expert Laravel developer tasked with analyzing a codebase to create de
 - Use SIMPLE alphanumeric node IDs without special characters (e.g., A1, UserAuth, DB1).
 - IMPORTANT: Node IDs must be simple and cannot contain special characters, spaces, or punctuation.
 - For node labels, use only basic characters inside square brackets: [Label text].
-- Avoid using parentheses, colons, or special characters in node labels.
+- Avoid using parentheses, colons, or other special characters in node labels (eg, <, >, &, etc).
 - For method names in labels, use dot notation without parentheses: "Controller.method" NOT "Controller@method" or "Controller->method()".
 - Decision diamonds should use simple yes/no or true/false paths.
 - Format subgraphs with proper syntax:
@@ -473,18 +473,26 @@ def write_report(files: list[str], implementation_summary: str) -> str:
     """Write a report of the changes to the codebase."""
     return "The report is as follows: " + implementation_summary
 
+def is_a_valid_directory(directory: str) -> bool:
+    return Path(directory).exists() and Path(directory).is_dir()
+
 @function_tool
 def list_files(directory: str, recursive: bool) -> str:
     """List all files in a directory."""
     print(f"- Listing files in {directory} {'recursively' if recursive else ''}")
     if filename_unsafe(directory):
         return "Forbidden"
+    if not is_a_valid_directory(directory):
+        return f"Not a valid directory: {directory}"
     file_list = ""
     if recursive:
         files = []
         for p in Path(directory).rglob("*"):
-            if p.is_file() and not any(part.startswith('.') for part in p.parts) and not any(part in ['node_modules', 'vendor', 'dist', 'build', 'public'] for part in p.parts):
-                files.append(str(p))
+            if not any(part.startswith('.') for part in p.parts) and not any(part in ['node_modules', 'vendor', 'dist', 'build', 'public'] for part in p.parts):
+                if p.is_file():
+                    files.append(str(p))
+                else:
+                    files.append(str(p) + "/")
         files = sorted(set(files))
         file_list = "\n".join(files)
     else:
@@ -492,7 +500,10 @@ def list_files(directory: str, recursive: bool) -> str:
             files = []
             for file in Path(directory).iterdir():
                 if not file.name.startswith("."):
-                    files.append(str(file))
+                    if file.is_file():
+                        files.append(str(file))
+                    else:
+                        files.append(str(file) + "/")
             file_list = "\n".join(files)
         except FileNotFoundError:
             file_list = f"Directory not found: {directory}"
@@ -603,6 +614,7 @@ if __name__ == "__main__":
     args.add_argument("--mode", type=str, required=False, default="code")
     args.add_argument("--model", type=str, required=False, default="o4-mini")
     args.add_argument("--no-readme", action="store_true", required=False, default=False)
+    args.add_argument("--output-file", type=str, required=False, default="report.md")
     args = args.parse_args()
     request = args.request
     mode = args.mode
@@ -652,3 +664,6 @@ if __name__ == "__main__":
     print_usage(result, args.model, total_time_in_seconds)
     print(f"\n\n- Final output:\n\n")
     print(result.final_output)
+    if args.output_file:
+        with open(args.output_file, "w") as f:
+            f.write(result.final_output)
