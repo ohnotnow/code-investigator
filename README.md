@@ -34,6 +34,8 @@ Run the main script with `uv`:
 uv run main.py --mode=code
 # in docs mode
 uv run main.py --mode=docs
+# in 'mermaid' mode
+uv run main.py --mode=mermaid
 ```
 
 In code mode this will:
@@ -42,6 +44,11 @@ In code mode this will:
 2. Get the overall project structure
 3. Begin to explore it, read files, search for references
 4. Write up a brief description of what changes should be made.
+
+In mermaid mode - it will behave similarly to code mode, but
+1. Ask you what feature or logic you want to explore
+...
+4. Generate a report on how that feature works and also write out a mermaidjs flowchart diagram of the logic
 
 In docs mode it will:
 
@@ -83,6 +90,11 @@ investigate() {
     python /Users/you/code/code-investigator/main.py --mode=code --request="$*"
     deactivate
 }
+mermaid() {
+    source /Users/you/code/code-investigator/.venv/bin/activate
+    python /Users/you/code/code-investigator/main.py --mode=mermaid --request="$*"
+    deactivate
+}
 ```
 
 And open a new shell or source the file.  Now you can just run things like :
@@ -95,6 +107,9 @@ $ docs 'explain how the Pydantic models relate to each other'
 
 # investigate an issue
 $ investigate 'Exception on line 302: main.py - invalid data in timestamp'
+
+# explore how a feature works
+$ mermaid 'How does the process for booking time on a piece of equipment work?'
 ```
 
 ## Example code-mode run
