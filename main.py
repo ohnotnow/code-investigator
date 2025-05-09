@@ -13,7 +13,7 @@ from tools import (
     get_git_remotes,
     write_report
 )
-from prompts import DOCS_PROMPT, CODE_PROMPT, MERMAID_PROMPT
+from prompts import DOCS_PROMPT, CODE_PROMPT, MERMAID_PROMPT, TESTING_PROMPT
 from utils import print_usage, sanitise_mermaid_syntax, strip_markdown
 
 
@@ -22,18 +22,10 @@ def main():
     args = parse_arguments()
     request = args.request
     mode = args.mode
-
-    if mode == "code":
-        prompt = CODE_PROMPT
-    elif mode == "docs":
-        prompt = DOCS_PROMPT
-    elif mode == "mermaid":
-        prompt = MERMAID_PROMPT
-    else:
-        raise ValueError(f"Invalid mode: {mode}")
+    prompt = get_prompt_for_mode(mode)
 
     request = ""
-    if mode == "code" or mode == "mermaid":
+    if mode == "code" or mode == "mermaid" or mode == "testing":
         if not args.request:
             request = input("Enter a request: ")
         else:
@@ -87,7 +79,10 @@ def run_agent(mode, model, request, rewrite_output, output_file):
     print(f"\n\n- Final output:\n\n")
 
     # Sanitize mermaid diagrams before writing
-    final_output = sanitise_mermaid_syntax(result.final_output)
+    if mode == "mermaid":
+        final_output = sanitise_mermaid_syntax(result.final_output)
+    else:
+        final_output = result.final_output
 
     if rewrite_output:
         final_output = rewrite_with_creative_model(final_output)
@@ -108,6 +103,8 @@ def get_prompt_for_mode(mode):
         return DOCS_PROMPT
     elif mode == "mermaid":
         return MERMAID_PROMPT
+    elif mode == "testing":
+        return TESTING_PROMPT
     else:
         raise ValueError(f"Invalid mode: {mode}")
 

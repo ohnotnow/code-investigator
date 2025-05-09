@@ -1,7 +1,6 @@
-# code-investigator
+# Code Investigator
 
-A little experiment in AI-powered tools for exploring and finding relevant sections to implement a feature or bugfix.  It can
-also give you a head start on generating a Readme for the project.
+A little experiment in AI-powered tools for exploring and finding relevant sections to implement a feature or bugfix.  It can also give you a head start on generating a Readme for the project, produce mermaid diagrams and specifically investigate your tests for gaps or missing code paths.
 
 ---
 
@@ -36,21 +35,27 @@ uv run main.py --mode=code
 uv run main.py --mode=docs
 # in 'mermaid' mode
 uv run main.py --mode=mermaid
+# in 'mermaid' mode
+uv run main.py --mode=testing
 ```
 
-In code mode this will:
+In **code mode** this will:
 
 1. Ask you what you want to do with the codebase
 2. Get the overall project structure
 3. Begin to explore it, read files, search for references
 4. Write up a brief description of what changes should be made.
 
-In mermaid mode - it will behave similarly to code mode, but
+In **mermaid mode** - it will behave similarly to code mode, but
 1. Ask you what feature or logic you want to explore
 ...
 4. Generate a report on how that feature works and also write out a mermaidjs flowchart diagram of the logic
 
-In docs mode it will:
+In **testing mode** - again it is very similar but will focus specifically on testing of your codebase.  And example of a request to it might be something like :
+
+> Could you suggest any improvements to our Booking Notifications test? What arent we testing, edge cases we have missed? Please look at the back-end controllers etc to check.  tests/Feature/BookingNotificationsTest.php
+
+In **docs mode** it will:
 
 1. Investigate the codebase
 2. Try and figure out the main parts, connections features
@@ -61,6 +66,7 @@ As well as the basic 'mode' you can pass the following :
 - `--no-readme`: only for 'docs' mode.  This skips the bit of the prompt which requires the LLM to write in the style of a GitHub readme
 - `--request`: Your specific requirements.  In code mode this is passed directly to the LLM as your requirements (if you don't pass it the script will prompt you for it).  In docs mode this is passed to the LLM as extra guidence ontop of the instruction to write in the style of a readme (unless you pass `--no-readme`)
 - `--model`: The OpenAI model you want to use.  Eg, 'gpt-4.1', 'o4-mini'.
+- `--rewrite`: Make an extra call to get another model rewrite the original output in a slightly less 'dry' style (mostly helpful on side projects or small projects you're just putting out there)
 
 Eg:
 ```bash
@@ -95,6 +101,11 @@ mermaid() {
     python /Users/you/code/code-investigator/main.py --mode=mermaid --request="$*"
     deactivate
 }
+testing() {
+    source /Users/you/code/code-investigator/.venv/bin/activate
+    python /Users/you/code/code-investigator/main.py --mode=testing --request="$*"
+    deactivate
+}
 ```
 
 And open a new shell or source the file.  Now you can just run things like :
@@ -110,6 +121,9 @@ $ investigate 'Exception on line 302: main.py - invalid data in timestamp'
 
 # explore how a feature works
 $ mermaid 'How does the process for booking time on a piece of equipment work?'
+
+# explore how a feature works
+$ testing 'Have we missed any edge cases in our ArchiveInactiveUsers test?'
 ```
 
 ## Example code-mode run
