@@ -35,7 +35,7 @@ uv run main.py --mode=code
 uv run main.py --mode=docs
 # in 'mermaid' mode
 uv run main.py --mode=mermaid
-# in 'mermaid' mode
+# in 'testing' mode
 uv run main.py --mode=testing
 ```
 
