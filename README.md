@@ -221,6 +221,105 @@ B. (Optional) If you wish the “Pending Users” table to mirror this column or
 - Sorting behavior remains intact, as the same `sortField` bindings are just moved to the appropriate headers.
 - This change is minimal, isolated to the view, and maintains consistency with existing Livewire conventions.
 
+----
+
+## Example mermaid-mode run
+
+1. Project Structure Summary
+- Laravel PHP application with both Livewire and Vue.js components.
+- Key directories:
+  • app/Http/Controllers (ChoiceController, ProjectAcceptanceController)
+  • resources/js/components (ProjectList.vue)
+  • resources/views/student/home.blade.php
+  • routes/web.php
+
+2. User Journey Overview
+• Student submits project choices via the Vue ProjectList component, invoking ChoiceController.store.
+• Admin accepts students onto a project via ProjectAcceptanceController.store.
+
+3. Key Components Identified
+- Routes (routes/web.php):
+  • GET  “/” → HomeController.index (middleware auth)
+  • POST “/choices” → ChoiceController.store
+  • GET  “/thank-you” → ChoiceController.thankYou
+  • POST “/project/{id}/accept-students” → ProjectAcceptanceController.store (middleware auth, policy)
+- Controllers: ChoiceController, ProjectAcceptanceController
+- Models: User, Project
+- Views/Components: resources/views/student/home.blade.php, ProjectList.vue, resources/views/student/thankyou.blade.php
+
+4. Flow Explanation
+Application Flow:
+1. Student navigates to home page (GET “/”), sees available projects.
+2. ProjectList Vue component renders projects and lets the student pick 5 preferences and a research area.
+3. On “Submit my choices”, submitChoices sends POST “/choices” to ChoiceController.store.
+4. Controller validates the choices array size and research area, checks max-3 projects per supervisor.
+5. On success: syncs pivot table (user.projects), updates user.research_area, queues ChoiceConfirmation email, dispatches an event, redirects to thank-you page.
+6. Student sees thank-you view.
+
+Acceptance Flow:
+1. Admin submits selected student IDs for a given project via POST “/project/{id}/accept-students”.
+2. ProjectAcceptanceController.store validates the “students” array, checks authorization (“accept-students” policy).
+3. If the user is admin, it first un-accepts any previously accepted students who are no longer in the submitted list.
+4. Finds the student users, for each: checks “accept-onto-project” policy and calls Project.accept(student) to mark them accepted.
+5. Dispatches an event, then redirects back to the project show page with success message.
+
+5. Mermaid Diagram
+```mermaid
+flowchart TD
+  subgraph ApplicationFlow
+    A1([Start Application Flow]) --> A2[HomeController.index]
+    A2 --> A3[Render student.home with ProjectList]
+    A3 --> A4[User selects preferences and clicks submit]
+    A4 --> A5[POST /choices to ChoiceController.store]
+    A5 --> A6{Valid choices array}
+    A6 -->|FAIL| A7[Return validation error]
+    A6 -->|OK| A8{Supervisor limit ok}
+    A8 -->|FAIL| A7
+    A8 -->|OK| A9[Sync user projects pivot]
+    A9 --> A10[Update user research area]
+    A10 --> A11[Queue ChoiceConfirmation mail]
+    A11 --> A12[Dispatch SomethingNoteworthyHappened]
+    A12 --> A13[Redirect to thank_you]
+    A13 --> A14[ChoiceController.thankYou view]
+    A14 --> A15([End Application Flow])
+  end
+
+  subgraph AcceptanceFlow
+    B1([Start Acceptance Flow]) --> B2[POST /project/id/accept-students]
+    B2 --> B3{students array present}
+    B3 -->|FAIL| B4[Return validation error]
+    B3 -->|OK| B5[Authorize accept-students policy]
+    B5 --> B6{User is admin}
+    B6 -->|Yes| B7[Unaccept removed students]
+    B6 -->|No| B8
+    B7 --> B8
+    B8 --> B9[Find student users]
+    B9 --> B10[For each student authorize accept-onto-project]
+    B10 --> B11[Project.acceptstudent]
+    B11 --> B12[Dispatch SomethingNoteworthyHappened]
+    B12 --> B13[Redirect to project.show]
+    B13 --> B14([End Acceptance Flow])
+  end
+```
+
+6. Simplified Test Diagram
+```mermaid
+flowchart TD
+  S1([Start]) --> S2[POST /choices]
+  S2 --> S3{Valid payload}
+  S3 -->|Yes| S4[Sync projects]
+  S3 -->|No| S5[Return error]
+  S4 --> S6([End])
+  S5 --> S6
+```
+
+7. Diagram Explanation
+- ApplicationFlow subgraph captures the student application process from viewing projects through final thank-you.
+- AcceptanceFlow subgraph details the admin-driven student acceptance process, including policy checks and pivot table updates.
+- Decision nodes ({…}) branch on validation and authorization outcomes with “OK/FAIL” labels.
+- Process nodes ([…]) denote controller methods, model sync, mail queuing, and events.
+- Start/end nodes are enclosed in double brackets to indicate flow boundaries.
+
 ---
 
 ## License
