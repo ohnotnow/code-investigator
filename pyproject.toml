@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "openai-agents>=0.0.13",
+    "openai-agents[litellm]>=0.0.13",
     "pydantic>=2.11.3",
     "pydantic-ai>=0.1.7",
 ]

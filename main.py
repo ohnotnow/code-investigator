@@ -2,9 +2,12 @@
 Code Investigator - A tool for investigating codebases using LLMs.
 """
 
+import os
 import argparse
+import asyncio
 import time
 from agents import Agent, Runner, ModelSettings
+from agents.extensions.models.litellm_model import LitellmModel
 from tools import (
     get_project_structure,
     list_files,
@@ -17,7 +20,7 @@ from prompts import DOCS_PROMPT, CODE_PROMPT, MERMAID_PROMPT, TESTING_PROMPT
 from utils import print_usage, sanitise_mermaid_syntax, strip_markdown
 
 
-def main():
+async def main():
     """Main entry point for the application."""
     args = parse_arguments()
     request = args.request
@@ -44,7 +47,7 @@ def main():
         exit(1)
 
     # Run the agent
-    run_agent(mode, args.model, request, args.rewrite_output, args.output_file)
+    await run_agent(mode, args.model, request, args.rewrite_output, args.output_file)
 
 
 def parse_arguments():
@@ -59,23 +62,27 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def run_agent(mode, model, request, rewrite_output, output_file):
+async def run_agent(mode, model_name, request, rewrite_output, output_file):
     """Run the agent with the given parameters."""
     start_time = time.time()
+
+    # model_name = "openrouter/mistralai/mistral-medium-3"
+    # api_key = os.getenv("OPENROUTER_API_KEY")
+    # model = LitellmModel(model=model_name, api_key=api_key)
     agent = Agent(
         name=f"{mode.capitalize()} Agent",
-        model=model,
+        model=model_name,
         tools=[list_files, cat_file, grep_file, get_project_structure, get_git_remotes],
         instructions=get_prompt_for_mode(mode),
         model_settings=ModelSettings(include_usage=True)
     )
 
-    print(f"\n\n- Starting agent using {model}...")
-    result = Runner.run_sync(agent, max_turns=50, input=request)
+    print(f"\n\n- Starting agent using {model_name}...")
+    result = await Runner.run(agent, max_turns=50, input=request)
     print(f"\n\n- Agent finished")
     end_time = time.time()
     total_time_in_seconds = round(end_time - start_time, 2)
-    print_usage(result, model, total_time_in_seconds)
+    print_usage(result, model_name, total_time_in_seconds)
     print(f"\n\n- Final output:\n\n")
 
     # Sanitize mermaid diagrams before writing
@@ -137,4 +144,4 @@ def get_output_filename(output_file, mode):
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
