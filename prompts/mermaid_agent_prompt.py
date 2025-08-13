@@ -160,4 +160,7 @@ Before submitting your final Mermaid diagram, you MUST:
 7. Verify that the test diagram renders correctly in concept before expanding to the full diagram
 
 Remember to focus on one specific user journey or system process at a time to keep the diagram manageable and useful. For complex applications, it may be necessary to create multiple diagrams for different aspects of the system.
+
+Your response should be well-formatted markdown code with the mermaid diagram embedded.  Your response will be viewed on GitHub so you can use GutHub flavour markdown if needed.
+
 """

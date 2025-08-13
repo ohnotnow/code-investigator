@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import time
 from agents import Agent, Runner, ModelSettings
+from litellm import acompletion
 from agents.extensions.models.litellm_model import LitellmModel
 from tools import (
     get_project_structure,
@@ -14,6 +15,7 @@ from tools import (
     cat_file,
     grep_file,
     get_git_remotes,
+    create_github_repo,
     write_report
 )
 from prompts import DOCS_PROMPT, CODE_PROMPT, MERMAID_PROMPT, TESTING_PROMPT
@@ -47,7 +49,35 @@ async def main():
         exit(1)
 
     # Run the agent
-    await run_agent(mode, args.model, request, args.rewrite_output, args.output_file)
+    output_filename = await run_agent(mode, args.model, request, args.rewrite_output, args.output_file)
+    if args.create_repo:
+        await create_new_repo(args.create_repo, output_filename, args.model)
+
+
+async def create_new_repo(repo_name, readme_filename, model_name: str) -> str:
+    """Create a new GitHub repository with the given name and README file."""
+    with open(readme_filename, "r") as f:
+        readme_contents = f.read()
+    description = await get_project_description(readme_contents, model_name)
+    repo_url = await create_github_repo(repo_name, readme_contents, description)
+    print(f"\n\n- New GitHub repository: {repo_url}")
+    print(f"- Repo description: {description}")
+    return repo_url
+
+
+async def get_project_description(readme_contents, model_name: str) -> str:
+    """Get a description of the project from the README file."""
+
+    response = await acompletion(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that can generate a **SHORT** description of a project from a README file.  This will be used to give a very brief project description on github so must just be a single sentence no more than 10 words."},
+            {"role": "user", "content": f"Please generate a **SHORT** single sentence description of the project from the following README file: <readme>\n\n{readme_contents}\n\n</readme>"}
+        ]
+    )
+
+    description = response.choices[0].message.content
+    return description.strip()[:100]
 
 
 def parse_arguments():
@@ -59,10 +89,11 @@ def parse_arguments():
     parser.add_argument("--no-readme", action="store_true", required=False, default=False, help="Do not use a GitHub Readme style for the output")
     parser.add_argument("--output-file", type=str, required=False, default=None, help="The file to write the output to")
     parser.add_argument("--rewrite-output", action="store_true", required=False, default=False, help="Rewrite the output using a more creative LLM model before writing to the output file")
+    parser.add_argument("--create-repo", type=str, required=False, default=None, help="Also create a GitHub repository with the given name")
     return parser.parse_args()
 
 
-async def run_agent(mode, model_name, request, rewrite_output, output_file):
+async def run_agent(mode, model_name, request, rewrite_output, output_file) -> str:
     """Run the agent with the given parameters."""
     start_time = time.time()
 
@@ -100,6 +131,8 @@ async def run_agent(mode, model_name, request, rewrite_output, output_file):
     output_filename = get_output_filename(output_file, mode)
     with open(output_filename, "w") as f:
         f.write(final_output)
+
+    return output_filename
 
 
 def get_prompt_for_mode(mode):
